@@ -88,8 +88,8 @@ The platform combines real-time atmospheric boundary physics modeling, indoor ai
 ### Installation
 ```bash
 # Clone the repository
-git clone https://github.com/dk07-glitch/-SaafSaans.git
-cd -SaafSaans
+git clone https://github.com/dk07-glitch/aeroshield-ai.git
+cd aeroshield-ai
 
 # Install dependencies
 npm install
