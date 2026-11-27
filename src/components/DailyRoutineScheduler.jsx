@@ -20,7 +20,6 @@ import {
 export default function DailyRoutineScheduler({ city, persona, onTaskComplete }) {
   const [completedTasks, setCompletedTasks] = useState({});
 
-  // Dynamic routine generator based on persona
   const routineSchedule = [
     {
       id: 'r1',
@@ -117,16 +116,16 @@ export default function DailyRoutineScheduler({ city, persona, onTaskComplete })
   const protectionScore = Math.min(100, Math.round((completedCount / routineSchedule.length) * 100));
 
   return (
-    <div className="space-y-6">
+    <section aria-labelledby="routine-heading" className="space-y-6">
       
       {/* Top Banner: Score & Persona Context */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-cyan-950/60 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <Calendar className="w-5 h-5 text-cyan-400" />
-            <h3 className="text-xl font-bold text-white font-['Outfit']">
+            <Calendar className="w-5 h-5 text-cyan-400" aria-hidden="true" />
+            <h2 id="routine-heading" className="text-xl font-bold text-white font-['Outfit']">
               Personalized 24-Hour Smog Routine
-            </h3>
+            </h2>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800">
               {persona.title}
             </span>
@@ -137,9 +136,20 @@ export default function DailyRoutineScheduler({ city, persona, onTaskComplete })
         </div>
 
         {/* Protection Score Meter */}
-        <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 flex items-center gap-4 shrink-0 w-full md:w-auto">
-          <div className="relative w-14 h-14 flex items-center justify-center">
-            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+        <div 
+          role="region" 
+          aria-label="Daily Airway Shield Level"
+          className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 flex items-center gap-4 shrink-0 w-full md:w-auto"
+        >
+          <div 
+            className="relative w-14 h-14 flex items-center justify-center"
+            role="progressbar"
+            aria-valuenow={protectionScore}
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-label={`Daily airway defense is ${protectionScore} percent`}
+          >
+            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
               <path
                 className="text-slate-800"
                 strokeWidth="3.5"
@@ -157,13 +167,13 @@ export default function DailyRoutineScheduler({ city, persona, onTaskComplete })
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
               />
             </svg>
-            <span className="absolute font-black text-sm text-cyan-300 font-['Outfit']">
+            <span className="absolute font-black text-sm text-cyan-300 font-['Outfit']" aria-hidden="true">
               {protectionScore}%
             </span>
           </div>
           <div>
             <div className="text-xs font-bold text-white">Daily Shield Level</div>
-            <div className="text-[11px] text-slate-400">
+            <div className="text-[11px] text-slate-400" aria-live="polite">
               {completedCount} of {routineSchedule.length} habits locked
             </div>
           </div>
@@ -171,7 +181,7 @@ export default function DailyRoutineScheduler({ city, persona, onTaskComplete })
       </div>
 
       {/* Routine Timeline Cards */}
-      <div className="space-y-4">
+      <div className="space-y-4" role="list" aria-label="Hourly Smog Safety Checklist">
         {routineSchedule.map((item) => {
           const Icon = item.icon;
           const isDone = !!completedTasks[item.id];
@@ -179,6 +189,7 @@ export default function DailyRoutineScheduler({ city, persona, onTaskComplete })
           return (
             <div
               key={item.id}
+              role="listitem"
               className={`rounded-2xl border transition-all p-5 ${
                 item.isGoldenWindow 
                   ? 'border-cyan-500/60 bg-gradient-to-r from-cyan-950/30 via-slate-900 to-slate-900 shadow-lg shadow-cyan-950/30' 
@@ -192,7 +203,7 @@ export default function DailyRoutineScheduler({ city, persona, onTaskComplete })
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                     item.isGoldenWindow ? 'bg-cyan-500/20 text-cyan-300' : 'bg-slate-800 text-slate-300'
                   }`}>
-                    <Icon className="w-5 h-5" />
+                    <Icon className="w-5 h-5" aria-hidden="true" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -204,16 +215,20 @@ export default function DailyRoutineScheduler({ city, persona, onTaskComplete })
                         </span>
                       )}
                     </div>
-                    <h4 className="text-base font-bold text-white font-['Outfit'] mt-0.5">
+                    <h3 className="text-base font-bold text-white font-['Outfit'] mt-0.5">
                       {item.title}
-                    </h4>
+                    </h3>
                   </div>
                 </div>
 
                 {/* Mark as Done Toggle */}
                 <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={isDone}
+                  aria-label={`Mark ${item.title} as ${isDone ? 'incomplete' : 'complete'}`}
                   onClick={() => toggleTask(item.id, item.protectionValue)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 ${
                     isDone 
                       ? 'bg-emerald-950 text-emerald-300 border border-emerald-700' 
                       : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
@@ -221,12 +236,12 @@ export default function DailyRoutineScheduler({ city, persona, onTaskComplete })
                 >
                   {isDone ? (
                     <>
-                      <Check className="w-4 h-4 text-emerald-400" />
+                      <Check className="w-4 h-4 text-emerald-400" aria-hidden="true" />
                       <span>Completed (+{item.protectionValue}pts)</span>
                     </>
                   ) : (
                     <>
-                      <Circle className="w-4 h-4 text-slate-400" />
+                      <Circle className="w-4 h-4 text-slate-400" aria-hidden="true" />
                       <span>Mark Complete</span>
                     </>
                   )}
@@ -240,7 +255,7 @@ export default function DailyRoutineScheduler({ city, persona, onTaskComplete })
 
               {/* Low Emission Eco-Hack Pill */}
               <div className="bg-slate-950/60 rounded-xl p-3 border border-slate-800/80 flex items-start gap-2 text-xs">
-                <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" aria-hidden="true" />
                 <div className="text-slate-300">
                   <strong className="text-emerald-300">Eco-Alternative Action:</strong> {item.lowEmissionTip}
                 </div>
@@ -250,6 +265,6 @@ export default function DailyRoutineScheduler({ city, persona, onTaskComplete })
         })}
       </div>
 
-    </div>
+    </section>
   );
 }

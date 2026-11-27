@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShieldAlert, 
   Wind, 
@@ -14,9 +14,11 @@ import {
   Wrench,
   Leaf,
   BarChart3,
-  HeartHandshake
+  HeartHandshake,
+  X
 } from 'lucide-react';
 import { CITIES, PERSONAS } from '../data/mockData';
+import { sanitizeInput } from '../utils/security';
 
 export default function Navbar({ 
   currentCity, 
@@ -30,14 +32,50 @@ export default function Navbar({
   const [showPersonaModal, setShowPersonaModal] = useState(false);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [customCityName, setCustomCityName] = useState('');
-  const [audioCtx, setAudioCtx] = useState(null);
-  const [noiseNode, setNoiseNode] = useState(null);
+  
+  const audioCtxRef = useRef(null);
+  const noiseNodeRef = useRef(null);
+  const cityButtonRef = useRef(null);
+  const personaButtonRef = useRef(null);
+
+  // Close modals on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showCityModal) {
+          setShowCityModal(false);
+          cityButtonRef.current?.focus();
+        }
+        if (showPersonaModal) {
+          setShowPersonaModal(false);
+          personaButtonRef.current?.focus();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showCityModal, showPersonaModal]);
+
+  // Clean up Web Audio on component unmount
+  useEffect(() => {
+    return () => {
+      if (noiseNodeRef.current) {
+        try { noiseNodeRef.current.stop(); } catch (e) { /* ignore */ }
+      }
+      if (audioCtxRef.current) {
+        try { audioCtxRef.current.close(); } catch (e) { /* ignore */ }
+      }
+    };
+  }, []);
 
   // Gentle Pink/Brown Noise Generator for Respiratory Calm & Focus using Web Audio API
   const toggleAmbientSound = () => {
     if (!isAudioPlaying) {
       try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+
+        const ctx = new AudioContextClass();
         const bufferSize = ctx.sampleRate * 2;
         const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
         const output = noiseBuffer.getChannelData(0);
@@ -59,7 +97,6 @@ export default function Navbar({
         whiteNoise.buffer = noiseBuffer;
         whiteNoise.loop = true;
 
-        // Lowpass filter for smooth rain/air filter sound
         const filter = ctx.createBiquadFilter();
         filter.type = 'lowpass';
         filter.frequency.value = 600;
@@ -72,18 +109,18 @@ export default function Navbar({
         gainNode.connect(ctx.destination);
         whiteNoise.start();
 
-        setAudioCtx(ctx);
-        setNoiseNode(whiteNoise);
+        audioCtxRef.current = ctx;
+        noiseNodeRef.current = whiteNoise;
         setIsAudioPlaying(true);
       } catch (err) {
         console.error('Web Audio error:', err);
       }
     } else {
-      if (noiseNode) {
-        try { noiseNode.stop(); } catch(e) {}
+      if (noiseNodeRef.current) {
+        try { noiseNodeRef.current.stop(); } catch(e) {}
       }
-      if (audioCtx) {
-        try { audioCtx.close(); } catch(e) {}
+      if (audioCtxRef.current) {
+        try { audioCtxRef.current.close(); } catch(e) {}
       }
       setIsAudioPlaying(false);
     }
@@ -101,12 +138,14 @@ export default function Navbar({
 
   const handleAddCustomCity = (e) => {
     e.preventDefault();
-    if (!customCityName.trim()) return;
+    const cleanName = sanitizeInput(customCityName, 60);
+    if (!cleanName) return;
+
     const newCity = {
       id: 'custom-' + Date.now(),
-      name: customCityName.trim(),
-      country: 'Custom Station',
-      aqi: Math.floor(Math.random() * 200 + 150),
+      name: cleanName,
+      country: 'User Configured Station',
+      aqi: Math.floor(Math.random() * 150 + 150),
       category: 'Unhealthy / Smog Alert',
       color: '#f97316',
       pm25: 110.5,
@@ -121,7 +160,7 @@ export default function Navbar({
       solarMixingWindow: '13:00 - 15:00',
       primarySources: [
         { name: 'Vehicular Traffic', percentage: 40, icon: 'Car' },
-        { name: 'Domestic Biomass/Heating', percentage: 35, icon: 'Flame' },
+        { name: 'Domestic Heating', percentage: 35, icon: 'Flame' },
         { name: 'Inversion Stagnation', percentage: 25, icon: 'CloudFog' }
       ],
       forecast: [
@@ -134,31 +173,42 @@ export default function Navbar({
     setCity(newCity);
     setCustomCityName('');
     setShowCityModal(false);
+    cityButtonRef.current?.focus();
   };
 
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#090d18]/85 border-b border-slate-800/80 shadow-2xl transition-all">
+    <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#090d18]/90 border-b border-slate-800/80 shadow-2xl transition-all">
       {/* Top Banner Alert Bar */}
-      <div className="bg-gradient-to-r from-red-950/70 via-amber-950/50 to-red-950/70 border-b border-red-500/20 px-4 py-1.5 text-xs flex items-center justify-between text-slate-300">
+      <div 
+        role="region" 
+        aria-label="Current Air Quality Alert Banner"
+        className="bg-gradient-to-r from-red-950/70 via-amber-950/50 to-red-950/70 border-b border-red-500/20 px-4 py-1.5 text-xs flex items-center justify-between text-slate-300"
+      >
         <div className="flex items-center gap-2">
-          <span className="relative flex h-2 w-2">
+          <span className="relative flex h-2 w-2" aria-hidden="true">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
           </span>
           <span className="font-semibold text-red-300">Severe Winter Smog Alert:</span>
           <span className="hidden sm:inline text-slate-300">
-            {currentCity.name} experiencing extreme atmospheric stagnation (Inversion height {currentCity.inversionHeight}m).
+            {currentCity.name} experiencing extreme atmospheric stagnation (Inversion ceiling {currentCity.inversionHeight}m).
           </span>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-cyan-400 font-medium">Ventilation Window: {currentCity.solarMixingWindow}</span>
           <button 
+            type="button"
             onClick={toggleAmbientSound}
-            title={isAudioPlaying ? "Mute Air Sanctuary Sound" : "Play Clean Air Ambient Rain/Noise"}
-            className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-[11px] border border-slate-700 transition"
+            aria-pressed={isAudioPlaying}
+            aria-label={isAudioPlaying ? "Turn off ambient air sanctuary sound" : "Turn on ambient air sanctuary sound"}
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-[11px] border border-slate-700 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
           >
-            {isAudioPlaying ? <Volume2 className="w-3.5 h-3.5 text-cyan-400 animate-pulse" /> : <VolumeX className="w-3.5 h-3.5 text-slate-400" />}
-            <span className="hidden md:inline">{isAudioPlaying ? "Soothing Air Sound ON" : "Soothing Air Sound"}</span>
+            {isAudioPlaying ? (
+              <Volume2 className="w-3.5 h-3.5 text-cyan-400 animate-pulse" aria-hidden="true" />
+            ) : (
+              <VolumeX className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+            )}
+            <span className="hidden md:inline">{isAudioPlaying ? "Air Sound ON" : "Soothing Air Sound"}</span>
           </button>
         </div>
       </div>
@@ -168,10 +218,15 @@ export default function Navbar({
         <div className="flex items-center justify-between gap-4">
           
           {/* Logo & Brand */}
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('radar')}>
+          <button 
+            type="button"
+            className="flex items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded-2xl p-1"
+            onClick={() => setActiveTab('radar')}
+            aria-label="AeroShield AI home - return to Smog Radar"
+          >
             <div className="relative flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-cyan-500 via-teal-500 to-blue-600 shadow-lg shadow-cyan-500/25 border border-cyan-300/30">
-              <ShieldAlert className="w-6 h-6 text-white" />
-              <Wind className="w-3.5 h-3.5 text-cyan-200 absolute -top-1 -right-1 animate-bounce" />
+              <ShieldAlert className="w-6 h-6 text-white" aria-hidden="true" />
+              <Wind className="w-3.5 h-3.5 text-cyan-200 absolute -top-1 -right-1" aria-hidden="true" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -186,20 +241,24 @@ export default function Navbar({
                 Winter Smog & Urban Clean Air Navigator
               </p>
             </div>
-          </div>
+          </button>
 
           {/* Quick Controls: City Picker & Persona Picker */}
           <div className="flex items-center gap-2 sm:gap-3">
             {/* City Selector Button */}
             <button
+              ref={cityButtonRef}
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded={showCityModal}
               onClick={() => setShowCityModal(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/70 hover:border-cyan-500/50 transition-all text-xs font-medium text-slate-200 shadow-sm group"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/70 hover:border-cyan-500/50 transition-all text-xs font-medium text-slate-200 shadow-sm group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
             >
-              <MapPin className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+              <MapPin className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" aria-hidden="true" />
               <div className="text-left">
                 <div className="text-[10px] text-slate-400 leading-none">Location</div>
                 <div className="font-semibold text-slate-100 flex items-center gap-1.5">
-                  {currentCity.name}
+                  <span>{currentCity.name}</span>
                   <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
                     currentCity.aqi > 300 ? 'bg-red-950 text-red-400' : 
                     currentCity.aqi > 150 ? 'bg-orange-950 text-orange-400' : 'bg-amber-950 text-amber-400'
@@ -208,46 +267,58 @@ export default function Navbar({
                   </span>
                 </div>
               </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
             </button>
 
             {/* Persona Selector Button */}
             <button
+              ref={personaButtonRef}
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded={showPersonaModal}
               onClick={() => setShowPersonaModal(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/70 hover:border-purple-500/50 transition-all text-xs font-medium text-slate-200 shadow-sm group"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/70 hover:border-purple-500/50 transition-all text-xs font-medium text-slate-200 shadow-sm group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
             >
-              <Users className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+              <Users className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" aria-hidden="true" />
               <div className="text-left hidden md:block">
-                <div className="text-[10px] text-slate-400 leading-none">Family Persona</div>
+                <div className="text-[10px] text-slate-400 leading-none">Household Profile</div>
                 <div className="font-semibold text-slate-100 truncate max-w-[130px]">
                   {currentPersona.title}
                 </div>
               </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
             </button>
           </div>
 
         </div>
 
-        {/* Tab Navigation Navigation Pills */}
-        <nav className="flex items-center gap-1.5 mt-3 overflow-x-auto pb-1 scrollbar-none text-xs font-medium">
+        {/* Tab Navigation Pills */}
+        <nav 
+          role="tablist" 
+          aria-label="Dashboard views"
+          className="flex items-center gap-1.5 mt-3 overflow-x-auto pb-1 scrollbar-none text-xs font-medium"
+        >
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (
               <button
                 key={item.id}
+                role="tab"
+                id={`tab-${item.id}`}
+                aria-selected={isActive}
+                aria-controls={`panel-${item.id}`}
                 onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl whitespace-nowrap transition-all ${
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl whitespace-nowrap transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 ${
                   isActive 
                     ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 border border-cyan-500/40 shadow-lg shadow-cyan-500/10 font-semibold' 
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} aria-hidden="true" />
                 <span>{item.label}</span>
                 {item.id === 'copilot' && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" aria-hidden="true"></span>
                 )}
               </button>
             );
@@ -257,31 +328,45 @@ export default function Navbar({
 
       {/* Modal: Select City */}
       {showCityModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+        <div 
+          role="dialog" 
+          aria-modal="true" 
+          aria-labelledby="city-dialog-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+        >
           <div className="bg-[#0f172a] border border-slate-700/80 rounded-2xl w-full max-w-lg p-6 shadow-2xl text-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-cyan-400" />
-                <h3 className="text-lg font-bold text-white font-['Outfit']">Select Smog Hotspot or Add City</h3>
+                <MapPin className="w-5 h-5 text-cyan-400" aria-hidden="true" />
+                <h2 id="city-dialog-title" className="text-lg font-bold text-white font-['Outfit']">
+                  Select Smog Hotspot or Add Custom City
+                </h2>
               </div>
               <button 
-                onClick={() => setShowCityModal(false)}
-                className="text-slate-400 hover:text-white text-sm px-2 py-1 rounded-lg hover:bg-slate-800"
+                type="button"
+                onClick={() => {
+                  setShowCityModal(false);
+                  cityButtonRef.current?.focus();
+                }}
+                aria-label="Close location selector"
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
               >
-                ✕
+                <X className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>
 
             {/* City Preset List */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 my-4 max-h-60 overflow-y-auto pr-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 my-4 max-h-60 overflow-y-auto pr-1" role="list">
               {CITIES.map((c) => (
                 <button
                   key={c.id}
+                  type="button"
                   onClick={() => {
                     setCity(c);
                     setShowCityModal(false);
+                    cityButtonRef.current?.focus();
                   }}
-                  className={`p-3 rounded-xl border text-left transition flex items-center justify-between ${
+                  className={`p-3 rounded-xl border text-left transition flex items-center justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 ${
                     currentCity.id === c.id 
                       ? 'border-cyan-500 bg-cyan-950/40 text-cyan-200' 
                       : 'border-slate-800 bg-slate-900/60 hover:bg-slate-800/80 text-slate-300'
@@ -303,16 +388,19 @@ export default function Navbar({
 
             {/* Custom City Input Form */}
             <form onSubmit={handleAddCustomCity} className="mt-4 pt-4 border-t border-slate-800 flex gap-2">
+              <label htmlFor="custom-city-input" className="sr-only">Enter custom neighborhood or city</label>
               <input
+                id="custom-city-input"
                 type="text"
+                maxLength={60}
                 placeholder="Or enter custom neighborhood/city..."
                 value={customCityName}
                 onChange={(e) => setCustomCityName(e.target.value)}
-                className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus-visible:outline-none focus-visible:border-cyan-500 focus-visible:ring-1 focus-visible:ring-cyan-500"
               />
               <button
                 type="submit"
-                className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl text-xs font-semibold shadow-md transition"
+                className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl text-xs font-semibold shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
               >
                 Set Location
               </button>
@@ -323,18 +411,30 @@ export default function Navbar({
 
       {/* Modal: Select Persona */}
       {showPersonaModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+        <div 
+          role="dialog" 
+          aria-modal="true" 
+          aria-labelledby="persona-dialog-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+        >
           <div className="bg-[#0f172a] border border-slate-700/80 rounded-2xl w-full max-w-xl p-6 shadow-2xl text-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-purple-400" />
-                <h3 className="text-lg font-bold text-white font-['Outfit']">Select Household & Lifestyle Persona</h3>
+                <Users className="w-5 h-5 text-purple-400" aria-hidden="true" />
+                <h2 id="persona-dialog-title" className="text-lg font-bold text-white font-['Outfit']">
+                  Select Household & Vulnerability Profile
+                </h2>
               </div>
               <button 
-                onClick={() => setShowPersonaModal(false)}
-                className="text-slate-400 hover:text-white text-sm px-2 py-1 rounded-lg hover:bg-slate-800"
+                type="button"
+                onClick={() => {
+                  setShowPersonaModal(false);
+                  personaButtonRef.current?.focus();
+                }}
+                aria-label="Close household selector"
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
               >
-                ✕
+                <X className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>
 
@@ -342,15 +442,17 @@ export default function Navbar({
               AeroShield customizes all daily schedules, outdoor warnings, and IAQ filtration thresholds based on the physiological vulnerability of your household.
             </p>
 
-            <div className="space-y-2.5 my-4 max-h-80 overflow-y-auto pr-1">
+            <div className="space-y-2.5 my-4 max-h-80 overflow-y-auto pr-1" role="list">
               {PERSONAS.map((p) => (
-                <div
+                <button
                   key={p.id}
+                  type="button"
                   onClick={() => {
                     setPersona(p);
                     setShowPersonaModal(false);
+                    personaButtonRef.current?.focus();
                   }}
-                  className={`p-3.5 rounded-xl border cursor-pointer transition ${
+                  className={`w-full p-3.5 rounded-xl border text-left cursor-pointer transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 ${
                     currentPersona.id === p.id 
                       ? 'border-purple-500 bg-purple-950/30' 
                       : 'border-slate-800 bg-slate-900/60 hover:bg-slate-800/80'
@@ -364,7 +466,7 @@ export default function Navbar({
                       </span>
                     </div>
                     {currentPersona.id === p.id && (
-                      <CheckCircle2 className="w-4 h-4 text-purple-400" />
+                      <CheckCircle2 className="w-4 h-4 text-purple-400" aria-hidden="true" />
                     )}
                   </div>
                   <p className="text-xs text-slate-300 leading-relaxed mb-2">{p.description}</p>
@@ -375,7 +477,7 @@ export default function Navbar({
                       </span>
                     ))}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>

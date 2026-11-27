@@ -16,24 +16,27 @@ import {
   Layers
 } from 'lucide-react';
 import { IAQ_HACKS } from '../data/mockData';
+import { clampNumber } from '../utils/security';
 
 export default function IAQHacksLab() {
   const [selectedHack, setSelectedHack] = useState(IAQ_HACKS[0]);
   const [activeCategory, setActiveCategory] = useState('All');
 
-  // DIY Corsi-Rosenthal Calculator State
+  // DIY Corsi-Rosenthal Calculator State with bounds clamping
   const [roomArea, setRoomArea] = useState(300); // sq ft
   const [ceilingHeight, setCeilingHeight] = useState(8); // ft
   const [fanSpeed, setFanSpeed] = useState('med'); // 'low', 'med', 'high'
   const [filterType, setFilterType] = useState('merv13_2inch'); // 'merv13_1inch', 'merv13_2inch'
 
   // Calculator physics math
-  const roomVolume = roomArea * ceilingHeight; // cu ft
+  const safeArea = clampNumber(roomArea, 80, 1500, 300);
+  const safeHeight = clampNumber(ceilingHeight, 6, 20, 8);
+  const roomVolume = Math.max(1, safeArea * safeHeight); // cu ft
   const baseCfm = fanSpeed === 'low' ? 320 : fanSpeed === 'med' ? 520 : 640;
   const filterMultiplier = filterType === 'merv13_2inch' ? 1.08 : 0.95;
   const effectiveCadr = Math.round(baseCfm * filterMultiplier);
   const airChangesPerHour = ((effectiveCadr * 60) / roomVolume).toFixed(1);
-  const clearanceMinutes = Math.round((Math.log(10) * roomVolume) / (effectiveCadr * 0.95)); // Time to 90% reduction
+  const clearanceMinutes = Math.max(1, Math.round((Math.log(10) * roomVolume) / (effectiveCadr * 0.95)));
   const costCommercialHepa = 299;
   const costCrBox = 34;
   const moneySaved = costCommercialHepa - costCrBox;
@@ -45,18 +48,18 @@ export default function IAQHacksLab() {
     : IAQ_HACKS.filter(h => h.category === activeCategory);
 
   return (
-    <div className="space-y-8">
+    <section aria-labelledby="iaq-heading" className="space-y-8">
       
       {/* Top Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-cyan-950/50 border border-slate-800 rounded-3xl p-6 shadow-xl">
         <div className="flex items-center gap-3 mb-2">
           <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/30">
-            <Wrench className="w-5 h-5" />
+            <Wrench className="w-5 h-5" aria-hidden="true" />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-white font-['Outfit']">
+            <h2 id="iaq-heading" className="text-xl font-bold text-white font-['Outfit']">
               Indoor Air Quality (IAQ) Lab & Engineering Hacks
-            </h3>
+            </h2>
             <p className="text-xs text-slate-400">
               Low-cost, peer-reviewed engineering hacks to transform any ordinary winter home into a medical-grade clean air sanctuary.
             </p>
@@ -65,8 +68,12 @@ export default function IAQHacksLab() {
       </div>
 
       {/* Featured Tool: Interactive Corsi-Rosenthal Box CADR Calculator */}
-      <div className="bg-[#0f172a] border border-cyan-500/30 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div 
+        role="region" 
+        aria-labelledby="calculator-heading"
+        className="bg-[#0f172a] border border-cyan-500/30 rounded-3xl p-6 shadow-2xl relative overflow-hidden"
+      >
+        <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" aria-hidden="true"></div>
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
           <div>
@@ -76,9 +83,9 @@ export default function IAQHacksLab() {
               </span>
               <span className="text-xs text-slate-400">• UC Davis Validated Formula</span>
             </div>
-            <h4 className="text-lg font-bold text-white font-['Outfit'] mt-1">
+            <h3 id="calculator-heading" className="text-lg font-bold text-white font-['Outfit'] mt-1">
               Corsi-Rosenthal Box Performance & Sizing Calculator
-            </h4>
+            </h3>
             <p className="text-xs text-slate-400">
               Calculate the Clean Air Delivery Rate (CADR), air turnover speed, and particulate decay for your custom room dimensions.
             </p>
@@ -87,11 +94,15 @@ export default function IAQHacksLab() {
           <div className="flex items-center gap-3 text-right">
             <div className="bg-slate-900/90 border border-slate-800 p-3 rounded-2xl">
               <div className="text-[10px] text-slate-400 uppercase font-semibold">CADR Air Delivery</div>
-              <div className="text-xl font-black text-cyan-400 font-['Outfit']">{effectiveCadr} CFM</div>
+              <div className="text-xl font-black text-cyan-400 font-['Outfit']" aria-live="polite">
+                {effectiveCadr} CFM
+              </div>
             </div>
             <div className="bg-slate-900/90 border border-slate-800 p-3 rounded-2xl">
               <div className="text-[10px] text-slate-400 uppercase font-semibold">90% Clearance</div>
-              <div className="text-xl font-black text-emerald-400 font-['Outfit']">{clearanceMinutes} mins</div>
+              <div className="text-xl font-black text-emerald-400 font-['Outfit']" aria-live="polite">
+                {clearanceMinutes} mins
+              </div>
             </div>
           </div>
         </div>
@@ -101,19 +112,24 @@ export default function IAQHacksLab() {
           {/* Room Area */}
           <div className="bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
             <div className="flex justify-between text-xs text-slate-300 font-medium mb-1.5">
-              <span>Room Area</span>
+              <label htmlFor="room-area-slider" className="cursor-pointer">Room Area</label>
               <span className="text-cyan-400 font-bold">{roomArea} sq ft</span>
             </div>
             <input 
+              id="room-area-slider"
               type="range" 
               min="100" 
               max="800" 
               step="25"
               value={roomArea}
-              onChange={(e) => setRoomArea(Number(e.target.value))}
-              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+              aria-valuemin="100"
+              aria-valuemax="800"
+              aria-valuenow={roomArea}
+              aria-valuetext={`${roomArea} square feet`}
+              onChange={(e) => setRoomArea(clampNumber(e.target.value, 100, 800, 300))}
+              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
             />
-            <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+            <div className="flex justify-between text-[10px] text-slate-500 mt-1" aria-hidden="true">
               <span>Small Room (120)</span>
               <span>Hall (600+)</span>
             </div>
@@ -122,19 +138,24 @@ export default function IAQHacksLab() {
           {/* Ceiling Height */}
           <div className="bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
             <div className="flex justify-between text-xs text-slate-300 font-medium mb-1.5">
-              <span>Ceiling Height</span>
+              <label htmlFor="ceiling-height-slider" className="cursor-pointer">Ceiling Height</label>
               <span className="text-cyan-400 font-bold">{ceilingHeight} ft</span>
             </div>
             <input 
+              id="ceiling-height-slider"
               type="range" 
               min="7" 
               max="14" 
               step="0.5"
               value={ceilingHeight}
-              onChange={(e) => setCeilingHeight(Number(e.target.value))}
-              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+              aria-valuemin="7"
+              aria-valuemax="14"
+              aria-valuenow={ceilingHeight}
+              aria-valuetext={`${ceilingHeight} feet`}
+              onChange={(e) => setCeilingHeight(clampNumber(e.target.value, 7, 14, 8))}
+              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
             />
-            <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+            <div className="flex justify-between text-[10px] text-slate-500 mt-1" aria-hidden="true">
               <span>Standard (8ft)</span>
               <span>Loft (12ft)</span>
             </div>
@@ -142,13 +163,16 @@ export default function IAQHacksLab() {
 
           {/* Fan Speed */}
           <div className="bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
-            <div className="text-xs text-slate-300 font-medium mb-2">Fan Operating Speed</div>
-            <div className="grid grid-cols-3 gap-1">
+            <div className="text-xs text-slate-300 font-medium mb-2" id="fan-speed-label">Fan Operating Speed</div>
+            <div className="grid grid-cols-3 gap-1" role="radiogroup" aria-labelledby="fan-speed-label">
               {['low', 'med', 'high'].map(s => (
                 <button
                   key={s}
+                  type="button"
+                  role="radio"
+                  aria-checked={fanSpeed === s}
                   onClick={() => setFanSpeed(s)}
-                  className={`py-1 text-xs uppercase font-bold rounded-lg transition ${
+                  className={`py-1 text-xs uppercase font-bold rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 ${
                     fanSpeed === s 
                       ? 'bg-cyan-500 text-slate-950 shadow-sm' 
                       : 'bg-slate-800 text-slate-400 hover:text-white'
@@ -158,18 +182,21 @@ export default function IAQHacksLab() {
                 </button>
               ))}
             </div>
-            <div className="text-[10px] text-slate-500 mt-2 text-center">
+            <div className="text-[10px] text-slate-500 mt-2 text-center" aria-live="polite">
               {fanSpeed === 'low' ? 'Whisper (<42 dB)' : fanSpeed === 'med' ? 'Daily Work (48 dB)' : 'Turbo Flush (56 dB)'}
             </div>
           </div>
 
           {/* Filter Thickness */}
           <div className="bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
-            <div className="text-xs text-slate-300 font-medium mb-2">Filter Configuration</div>
+            <label htmlFor="filter-type-select" className="block text-xs text-slate-300 font-medium mb-2">
+              Filter Configuration
+            </label>
             <select
+              id="filter-type-select"
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="w-full bg-slate-800 text-xs text-slate-200 rounded-xl p-2 border border-slate-700 focus:outline-none"
+              className="w-full bg-slate-800 text-xs text-slate-200 rounded-xl p-2 border border-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
             >
               <option value="merv13_2inch">4x 20x20x2" MERV 13 (Optimal)</option>
               <option value="merv13_1inch">4x 20x20x1" MERV 13 (Standard)</option>
@@ -183,25 +210,31 @@ export default function IAQHacksLab() {
         {/* Live Calculation Output Callout */}
         <div className="mt-6 bg-slate-950/80 p-4 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs">
           <div className="flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-emerald-400" />
+            <CheckCircle className="w-4 h-4 text-emerald-400" aria-hidden="true" />
             <span className="text-slate-300">
-              Achieves <strong>{airChangesPerHour} Air Changes Per Hour (ACH)</strong>. CDC recommends ≥5 ACH for sterile air filtration.
+              Achieves <strong>{airChangesPerHour} Air Changes Per Hour (ACH)</strong>. CDC recommends ≥5 ACH for clean air turnover.
             </span>
           </div>
           <div className="flex items-center gap-2 text-slate-400">
-            <DollarSign className="w-4 h-4 text-emerald-400" />
+            <DollarSign className="w-4 h-4 text-emerald-400" aria-hidden="true" />
             <span>DIY Parts: ~$34 • Annual Electricity: ~$24</span>
           </div>
         </div>
       </div>
 
       {/* Category Filter Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs">
+      <div 
+        role="tablist" 
+        aria-label="IAQ Hack Categories"
+        className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs"
+      >
         {categories.map((cat) => (
           <button
             key={cat}
+            role="tab"
+            aria-selected={activeCategory === cat}
             onClick={() => setActiveCategory(cat)}
-            className={`px-3.5 py-1.5 rounded-xl whitespace-nowrap transition ${
+            className={`px-3.5 py-1.5 rounded-xl whitespace-nowrap transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 ${
               activeCategory === cat 
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold' 
                 : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
@@ -213,14 +246,23 @@ export default function IAQHacksLab() {
       </div>
 
       {/* Hacks Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" role="list">
         {filteredHacks.map((hack) => {
           const isSelected = selectedHack.id === hack.id;
           return (
             <div
               key={hack.id}
+              role="listitem"
               onClick={() => setSelectedHack(hack)}
-              className={`rounded-2xl border p-5 cursor-pointer transition-all flex flex-col justify-between ${
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelectedHack(hack);
+                }
+              }}
+              tabIndex={0}
+              aria-label={`Inspect ${hack.title} blueprint`}
+              className={`rounded-2xl border p-5 cursor-pointer transition-all flex flex-col justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 ${
                 isSelected 
                   ? 'border-cyan-500 bg-cyan-950/20 shadow-lg shadow-cyan-950/30 ring-1 ring-cyan-500/40' 
                   : 'border-slate-800 bg-[#0f172a]/90 hover:border-slate-700 hover:bg-slate-900'
@@ -234,9 +276,9 @@ export default function IAQHacksLab() {
                   <span className="text-xs text-emerald-400 font-semibold">{hack.cost}</span>
                 </div>
 
-                <h4 className="text-base font-bold text-white font-['Outfit'] mb-2">
+                <h3 className="text-base font-bold text-white font-['Outfit'] mb-2">
                   {hack.title}
-                </h4>
+                </h3>
 
                 <p className="text-xs text-slate-400 leading-relaxed mb-4">
                   {hack.description}
@@ -245,8 +287,8 @@ export default function IAQHacksLab() {
 
               <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-300">
                 <span className="text-cyan-300 font-medium">{hack.efficiency}</span>
-                <span className="flex items-center gap-1 text-slate-400 hover:text-white">
-                  Inspect Blueprint <ChevronRight className="w-3.5 h-3.5" />
+                <span className="flex items-center gap-1 text-slate-400 group-hover:text-white">
+                  Inspect Blueprint <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
                 </span>
               </div>
             </div>
@@ -256,13 +298,17 @@ export default function IAQHacksLab() {
 
       {/* Active Selected Hack Blueprint Inspector */}
       {selectedHack && (
-        <div className="bg-[#0f172a] border border-slate-700 rounded-3xl p-6 shadow-2xl">
+        <div 
+          role="region" 
+          aria-labelledby="active-hack-title"
+          className="bg-[#0f172a] border border-slate-700 rounded-3xl p-6 shadow-2xl"
+        >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
             <div>
               <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
                 Detailed Implementation Blueprint
               </span>
-              <h3 className="text-xl font-bold text-white font-['Outfit'] mt-0.5">
+              <h3 id="active-hack-title" className="text-xl font-bold text-white font-['Outfit'] mt-0.5">
                 {selectedHack.title}
               </h3>
             </div>
@@ -280,12 +326,12 @@ export default function IAQHacksLab() {
             {/* Required Materials (4 cols) */}
             <div className="md:col-span-4 bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-                <Layers className="w-4 h-4 text-cyan-400" /> Required Items & Hardware
+                <Layers className="w-4 h-4 text-cyan-400" aria-hidden="true" /> Required Items & Hardware
               </h4>
               <ul className="space-y-2 text-xs text-slate-300">
                 {selectedHack.materials.map((mat, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" aria-hidden="true"></span>
                     <span>{mat}</span>
                   </li>
                 ))}
@@ -295,12 +341,15 @@ export default function IAQHacksLab() {
             {/* Step-by-Step Instructions (8 cols) */}
             <div className="md:col-span-8 bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-                <CheckCircle className="w-4 h-4 text-emerald-400" /> Step-by-Step Execution Protocol
+                <CheckCircle className="w-4 h-4 text-emerald-400" aria-hidden="true" /> Step-by-Step Execution Protocol
               </h4>
               <ol className="space-y-2.5 text-xs text-slate-300">
                 {selectedHack.steps.map((st, i) => (
                   <li key={i} className="flex items-start gap-3">
-                    <span className="w-5 h-5 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-800 flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">
+                    <span 
+                      aria-hidden="true"
+                      className="w-5 h-5 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-800 flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5"
+                    >
                       {i + 1}
                     </span>
                     <span className="leading-relaxed">{st}</span>
@@ -312,7 +361,7 @@ export default function IAQHacksLab() {
 
           {/* Scientific Rationale Math */}
           <div className="mt-5 p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 text-xs text-cyan-200 flex items-center gap-3">
-            <ShieldCheck className="w-5 h-5 text-cyan-400 shrink-0" />
+            <ShieldCheck className="w-5 h-5 text-cyan-400 shrink-0" aria-hidden="true" />
             <div>
               <strong className="text-white">Quantitative Scientific Rationale:</strong> {selectedHack.impactMath}
             </div>
@@ -320,6 +369,6 @@ export default function IAQHacksLab() {
         </div>
       )}
 
-    </div>
+    </section>
   );
 }
