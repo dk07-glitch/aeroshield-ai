@@ -121,9 +121,19 @@ export default function SmogHeroRadar({ city, persona }) {
     };
     window.addEventListener('resize', handleResize);
 
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      } else if (!prefersReducedMotion) {
+        animationFrameId = requestAnimationFrame(render);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearTimeout(resizeTimeout);
     };
   }, [viewMode, city, inversionSlider]);

@@ -125,7 +125,7 @@ export default function App() {
             )}
 
             {activeTab === 'iaq' && (
-              <IAQHacksLab />
+              <IAQHacksLab city={currentCity} />
             )}
 
             {activeTab === 'alternatives' && (

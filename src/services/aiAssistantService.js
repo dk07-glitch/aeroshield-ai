@@ -1,10 +1,49 @@
 // Intelligent GenAI Smog Copilot reasoning engine for AeroShield AI
 
+const requestTimestamps = [];
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute window
+const MAX_REQUESTS_PER_WINDOW = 20;
+
+/**
+ * Validates request frequency to protect against prompt flooding.
+ * @returns {boolean}
+ */
+export function checkRateLimit() {
+  const now = Date.now();
+  while (requestTimestamps.length > 0 && requestTimestamps[0] <= now - RATE_LIMIT_WINDOW_MS) {
+    requestTimestamps.shift();
+  }
+  if (requestTimestamps.length >= MAX_REQUESTS_PER_WINDOW) {
+    return false;
+  }
+  requestTimestamps.push(now);
+  return true;
+}
+
 export async function generateSmogAdvice({ prompt, city, persona, currentAqi }) {
+  if (!checkRateLimit()) {
+    return {
+      title: 'Model Request Rate Limit Notice',
+      summary: 'You have reached the temporary rate limit threshold (20 queries/minute) to protect model availability. Please wait a few seconds before asking another question.',
+      sections: [
+        {
+          heading: '🛡️ Rate Limit Security Policy',
+          content: 'This limit ensures optimal model response times and prevents Denial of Service (DoS) attacks on the reasoning engine.'
+        }
+      ],
+      impactStats: {
+        status: 'Cooldown',
+        window: '60s',
+        protection: 'Active'
+      },
+      sources: ['AeroShield AI Security Policy']
+    };
+  }
+
   // Simulate natural GenAI network stream delay for realistic UX
   await new Promise(resolve => setTimeout(resolve, 800));
 
-  const lower = prompt.toLowerCase();
+  const lower = (prompt || '').toLowerCase();
   
   // Custom tailored intelligent synthesis
   if (lower.includes('window') || lower.includes('ventil') || lower.includes('inversion')) {

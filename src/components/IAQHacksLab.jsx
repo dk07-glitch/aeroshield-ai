@@ -17,8 +17,9 @@ import {
 } from 'lucide-react';
 import { IAQ_HACKS } from '../data/mockData';
 import { clampNumber } from '../utils/security';
+import RoomIAQAudit from './RoomIAQAudit';
 
-export default function IAQHacksLab() {
+export default function IAQHacksLab({ city }) {
   const [selectedHack, setSelectedHack] = useState(IAQ_HACKS[0]);
   const [activeCategory, setActiveCategory] = useState('All');
 
@@ -66,6 +67,9 @@ export default function IAQHacksLab() {
           </div>
         </div>
       </div>
+
+      {/* Room-by-Room Microclimate Audit & Solar Ventilation Timer */}
+      <RoomIAQAudit city={city || { name: 'Local Area', solarMixingWindow: '13:00 - 15:30' }} />
 
       {/* Featured Tool: Interactive Corsi-Rosenthal Box CADR Calculator */}
       <div 
